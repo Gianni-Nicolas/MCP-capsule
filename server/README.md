@@ -197,7 +197,6 @@ $env:SPRING_PROFILES_ACTIVE="postgres"
 | `db_get_foreign_keys`     | FKs de la tabla (imported=salientes, exported=entrantes).                   |
 | `db_get_indexes`          | Indices con nombre, unicidad, tipo y columnas ordenadas.                    |
 | `db_get_constraints`      | PK + UNIQUE + FOREIGN_KEY de la tabla (CHECK se omite por soporte JDBC).    |
-| `db_get_table_snapshot`   | Vista agregada: metadata + columnas + PK + FKs + indices en 1 call.         |
 
 > Las tools se registran en `McpToolConfiguration`. Para **desactivar** una tool sin
 > borrarla (por ejemplo `db_get_table_snapshot`, y asi forzar al LLM a orquestar las
