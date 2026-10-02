@@ -11,12 +11,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Observabilidad tecnica del proceso de IA (Micrometer Observation).
  *
- * <p>Convive con el decorator {@link com.capsula.mcp.client.tool.RecordingToolCallback}:
- * <ul>
- *   <li>El decorator arma la traza que se DEVUELVE al usuario en la response (metadataUsed).</li>
- *   <li>Este handler emite LOGS tecnicos legibles de las observaciones RELEVANTES de
- *       Spring AI: las llamadas al modelo (chat) y a cada tool MCP, con su duracion.</li>
- * </ul>
+ * <p>Este handler emite LOGS tecnicos legibles de las observaciones RELEVANTES de
+ * Spring AI: las llamadas al modelo (chat) y a cada tool MCP, con su duracion.
  *
  * <p>El handler se declara como {@code @Bean}: Spring Boot lo auto-registra en el
  * {@link io.micrometer.observation.ObservationRegistry} que usa Spring AI (igual que los

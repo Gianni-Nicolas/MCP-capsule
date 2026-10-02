@@ -1,20 +1,14 @@
 package com.capsula.mcp.client.config;
 
-import com.capsula.mcp.client.tool.RecordingToolCallback;
-import com.capsula.mcp.client.tool.ToolInvocationRecorder;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Arrays;
-import java.util.List;
-
 /**
  * Configura el {@link ChatClient} usado para traducir lenguaje natural a SQL.
- * Registra las tools MCP del server (metadata JDBC) envueltas en
- * {@link RecordingToolCallback} para poder trazar cuales uso el LLM.
+ * Registra las tools MCP del server (metadata JDBC) para que el LLM pueda
+ * inspeccionar el esquema antes de generar la query.
  */
 @Configuration
 public class ChatClientConfig {
@@ -44,15 +38,10 @@ public class ChatClientConfig {
 
 	@Bean
 	ChatClient sqlChatClient(ChatClient.Builder builder,
-							 ToolCallbackProvider mcpToolCallbacks,
-							 ToolInvocationRecorder recorder) {
-		List<ToolCallback> recordingCallbacks = Arrays.stream(mcpToolCallbacks.getToolCallbacks())
-				.map(callback -> (ToolCallback) new RecordingToolCallback(callback, recorder))
-				.toList();
-
+							 ToolCallbackProvider mcpToolCallbacks) {
 		return builder
 				.defaultSystem(SYSTEM_PROMPT)
-				.defaultTools(recordingCallbacks)
+				.defaultTools((Object[]) mcpToolCallbacks.getToolCallbacks())
 				.build();
 	}
 }

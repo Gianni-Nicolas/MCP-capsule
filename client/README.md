@@ -39,7 +39,6 @@ llamar y en qué orden mediante un **tool-calling loop** gestionado por Spring A
   sin tocar código.
 - 🧠 **Soporte de modelos de razonamiento**: interceptor que limpia `reasoning_content`
   para providers que lo rechazan en el multi-turno.
-- 🧾 **Traza de tools**: opcionalmente devuelve qué tools MCP usó el LLM (`includeMetadata`).
 - 📊 **Observabilidad**: logs técnicos de cada llamada al LLM y a cada tool (Micrometer).
 - 📖 **Swagger UI**: documentación OpenAPI interactiva.
 
@@ -72,8 +71,6 @@ flowchart LR
 
     subgraph app["🟩 Código propio (este proyecto)"]
         Controller --> Service[QueryService]
-        Recording[RecordingToolCallback]
-        Recorder[ToolInvocationRecorder]
     end
 
     subgraph springai["🟦 Spring AI (dependencia)"]
@@ -84,11 +81,8 @@ flowchart LR
 
     Service --> ChatClient
     ChatModel <-->|REST OpenAI-compatible| Provider
-    ChatModel --> Recording
-    Recording -->|Streamable HTTP| MCP[(Server MCP<br/>metadata JDBC)]
+    ChatModel -->|Streamable HTTP| MCP[(Server MCP<br/>metadata JDBC)]
     MCP --> DB[(Base de datos)]
-    Recording --> Recorder
-    Recorder -.traza.-> Service
     Service -->|QueryResponse| Controller
 
     subgraph Provider["⬜ Proveedor LLM (infra: Groq · OpenRouter)"]
@@ -130,11 +124,9 @@ sequenceDiagram
     participant CM as 🟦 OpenAiChatModel (Spring AI · loop)
     participant P as ⬜ Proveedor LLM (infra)
     participant M as 🤖 Modelo LLM
-    participant RC as 🟩 RecordingToolCallback
     participant MCP as ⬜ Server MCP
 
     U->>S: POST /api/query
-    S->>S: recorder.clear()
     S->>CC: prompt().user(...).call()
     CC->>CM: delega en el motor
 
@@ -143,11 +135,8 @@ sequenceDiagram
         P->>M: ejecuta el modelo sobre el prompt
         M-->>P: decide usar una tool
         P-->>CM: finish_reason=tool_calls
-        CM->>RC: call(toolInput)
-        RC->>MCP: ejecuta tool (Streamable HTTP)
-        MCP-->>RC: resultado (metadata JDBC)
-        RC-->>CM: resultado
-        RC->>RC: recorder.record(...)
+        CM->>MCP: ejecuta tool (Streamable HTTP)
+        MCP-->>CM: resultado (metadata JDBC)
     end
 
     CM->>P: POST /chat/completions (historial + resultados)
@@ -157,7 +146,7 @@ sequenceDiagram
     CM-->>CC: ChatResponse
     CC-->>S: content() = SQL
     S->>S: sqlCleaner.clean(...)
-    S-->>U: QueryResponse { sql, metadataUsed? }
+    S-->>U: QueryResponse { sql }
 ```
 
 > 🟦 `ChatClient` y `OpenAiChatModel` son de **Spring AI** (no de este proyecto). El
@@ -170,8 +159,6 @@ sequenceDiagram
 
 **Puntos de enganche propios** alrededor del loop del framework:
 
-- `RecordingToolCallback` — decora cada tool MCP para registrar la invocación.
-- `ToolInvocationRecorder` — acumula la traza por request (request-scoped).
 - `ReasoningStripInterceptor` — limpia el body antes de cada POST (ver abajo).
 
 ---
@@ -246,14 +233,12 @@ código de este repo o algo que trae Spring AI por dependencia.
 | Componente | Origen | Qué hace |
 |------------|--------|----------|
 | `QueryController` | 🟩 Propio | Expone `POST /api/query`. |
-| `QueryService` | 🟩 Propio | Orquesta NL→SQL: llama al `ChatClient`, limpia el SQL y adjunta la traza. |
-| `RecordingToolCallback` | 🟩 Propio | Decorator que envuelve cada tool MCP para registrar la invocación. |
-| `ToolInvocationRecorder` | 🟩 Propio | Acumula la traza de tools por request (request-scoped). |
+| `QueryService` | 🟩 Propio | Orquesta NL→SQL: llama al `ChatClient` y limpia el SQL. |
 | `ReasoningStripInterceptor` | 🟩 Propio | Interceptor OkHttp que quita `reasoning_content` antes de cada POST. |
 | `SqlResponseCleaner` | 🟩 Propio | Quita fences markdown del SQL devuelto. |
 | **`ChatClient`** | 🟦 Spring AI | **Fachada** de alto nivel (`prompt().user().call()`). Agnóstica del proveedor. Es lo que usás en `QueryService`. |
 | **`OpenAiChatModel`** | 🟦 Spring AI | **Motor** detrás del `ChatClient`. Arma el `POST` REST al proveedor y **ejecuta el tool-calling loop**. Se llama "OpenAi" por el **protocolo** (OpenAI-compatible), no por la empresa: sirve para Groq y OpenRouter. |
-| `ToolCallback` (MCP) | 🟦 Spring AI | Representación de una tool MCP que el `ChatModel` puede invocar. `RecordingToolCallback` lo decora. |
+| `ToolCallback` (MCP) | 🟦 Spring AI | Representación de una tool MCP que el `ChatModel` puede invocar. |
 | Proveedor LLM | ⬜ Externo | **Infraestructura** que expone la API OpenAI-compatible: Groq / OpenRouter. Recibe el POST y ejecuta el modelo. No "piensa" él mismo. |
 | Modelo LLM | 🤖 Externo | El **LLM** que corre en la infra del proveedor (`qwen/qwen3.8-27b`, `north-mini-code`, …). Es quien realmente razona, decide las tools y genera el SQL. Se elige con `spring.ai.openai.chat.options.model`. |
 | Server MCP | ⬜ Externo | Servicio de metadata JDBC; se consulta por SSE en `:8080`. |
@@ -362,7 +347,7 @@ del `application.properties` (`openrouter`).
 ```powershell
 curl -Method POST http://localhost:8081/api/query `
   -ContentType 'application/json' `
-  -Body '{ "request": "clientes con al menos una tarjeta", "includeMetadata": true }'
+  -Body '{ "request": "clientes con al menos una tarjeta" }'
 ```
 
 O desde **Swagger UI**: http://localhost:8081/swagger-ui.html
@@ -413,8 +398,7 @@ java -jar target\client-0.0.1-SNAPSHOT.jar --spring.profiles.active=groq
 
 ```json
 {
-  "request": "traeme los clientes con al menos una tarjeta",
-  "includeMetadata": false
+  "request": "traeme los clientes con al menos una tarjeta"
 }
 ```
 
@@ -423,7 +407,7 @@ java -jar target\client-0.0.1-SNAPSHOT.jar --spring.profiles.active=groq
 | `request` | string | ✅ | Pedido en lenguaje natural. |
 | `includeMetadata` | boolean | ❌ (default `false`) | Si `true`, incluye la traza de tools MCP. |
 
-**Response** (`includeMetadata=false`)
+**Response** 
 
 ```json
 {
@@ -431,14 +415,12 @@ java -jar target\client-0.0.1-SNAPSHOT.jar --spring.profiles.active=groq
 }
 ```
 
-**Response** (`includeMetadata=true`) — incluye `metadataUsed` con la traza de tools.
-
 **Ejemplo cURL**
 
 ```bash
 curl -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"request":"clientes con al menos una tarjeta","includeMetadata":true}'
+  -d '{"request":"clientes con al menos una tarjeta"}'
 ```
 
 ---
@@ -516,7 +498,7 @@ Endpoints de Actuator expuestos: `health`, `info`, `metrics`.
 src/main/java/com/capsula/mcp/client/
 ├── ClientApplication.java            # main Spring Boot
 ├── config/
-│   ├── ChatClientConfig.java         # arma el ChatClient + envuelve tools MCP
+│   ├── ChatClientConfig.java         # arma el ChatClient + registra tools MCP
 │   ├── ObservabilityConfig.java      # logs técnicos de LLM y tools (Micrometer)
 │   ├── OpenApiConfig.java            # metadata Swagger/OpenAPI
 │   └── ReasoningContentStripConfig.java  # interceptor reasoning_content (condicional)
@@ -524,14 +506,10 @@ src/main/java/com/capsula/mcp/client/
 │   └── QueryController.java          # POST /api/query
 ├── dto/
 │   ├── QueryRequest.java
-│   ├── QueryResponse.java
-│   └── ToolInvocation.java
-├── service/
-│   ├── QueryService.java             # orquesta NL→SQL + traza
-│   └── SqlResponseCleaner.java       # limpia fences markdown del SQL
-└── tool/
-    ├── RecordingToolCallback.java    # decorator que registra cada tool MCP
-    └── ToolInvocationRecorder.java   # acumula la traza por request
+│   └── QueryResponse.java
+└── service/
+    ├── QueryService.java             # orquesta NL→SQL
+    └── SqlResponseCleaner.java       # limpia fences markdown del SQL
 
 src/main/resources/
 ├── application.properties            # base (perfil activo, MCP, swagger)

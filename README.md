@@ -110,24 +110,38 @@ cd client
 > También podés fijar el perfil con la variable de entorno
 > `$env:SPRING_PROFILES_ACTIVE = "openrouter"` antes de arrancar.
 
-### 4. Probar el endpoint
+### 4. Probar la app
+
+Con el server y el client levantados, tenés **dos formas** de probar el endpoint:
+
+#### Opción A — Swagger UI (recomendada) 🧪
+
+La forma más simple de probar la app sin herramientas externas. Abrí en el navegador:
+
+**http://localhost:8081/swagger-ui.html**
+
+Ahí vas a ver el endpoint `POST /api/query` documentado. Hacé clic en **"Try it out"**,
+escribí tu pedido en lenguaje natural en el campo `request` y presioná **"Execute"**:
+la respuesta con el SQL generado aparece directamente en la página.
+
+#### Opción B — cURL
 
 ```powershell
 curl -Method POST http://localhost:8081/api/query `
   -ContentType 'application/json' `
-  -Body '{ "request": "clientes con al menos una tarjeta", "includeMetadata": false }'
+  -Body '{ "request": "clientes con al menos una tarjeta" }'
 ```
 
 Respuesta:
 
 ```json
 {
-  "sql": "SELECT c.ID, c.FIRST_NAME, c.LAST_NAME FROM PRUEBA_MCP.CUSTOMER c JOIN PRUEBA_MCP.BANK_ACCOUNT ba ON c.ID = ba.CUSTOMER_ID JOIN PRUEBA_MCP.CARD ca ON ba.ID = ca.BANK_ACCOUNT_ID GROUP BY c.ID, c.FIRST_NAME, c.LAST_NAME HAVING COUNT(ca.ID) >= 1"
+   "sql": "SELECT c.ID, c.FIRST_NAME, c.LAST_NAME FROM PRUEBA_MCP.CUSTOMER c JOIN PRUEBA_MCP.BANK_ACCOUNT ba ON c.ID = ba.CUSTOMER_ID JOIN PRUEBA_MCP.CARD ca ON ba.ID = ca.BANK_ACCOUNT_ID GROUP BY c.ID, c.FIRST_NAME, c.LAST_NAME HAVING COUNT(ca.ID) >= 1"
 }
 ```
 
-Con `"includeMetadata": true` la respuesta incluye además la **traza de tools MCP**
-que el LLM usó para construir la query.
+La query se devuelve en una sola línea, lista para copiar y pegar directamente en una
+consola SQL (p. ej. la de H2).
 
 ---
 

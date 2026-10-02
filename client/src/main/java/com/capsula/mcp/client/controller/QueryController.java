@@ -19,8 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
  * Endpoint de chat NL->SQL.
  *
  * POST /api/query
- * Body: { "request": "traeme los empleados del departamento de ventas", "includeMetadata": false }
- * Respuesta: { "sql": "SELECT ..." } (+ "metadataUsed" si includeMetadata=true)
+ * Body: { "request": "clientes con al menos una tarjeta" }
+ * Respuesta: { "sql": "SELECT ..." }
  */
 @RestController
 @RequestMapping("/api/query")
@@ -39,7 +39,6 @@ public class QueryController {
 			description = """
 					Recibe un pedido en lenguaje natural y devuelve UNA sentencia SQL valida.
 					El LLM inspecciona el esquema real via tools MCP antes de construir la query.
-					Si 'includeMetadata' es true, la respuesta incluye la traza de tools MCP usadas.
 					""")
 	@ApiResponses({
 			@ApiResponse(responseCode = "200", description = "SQL generada correctamente",

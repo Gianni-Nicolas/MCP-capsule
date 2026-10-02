@@ -27,8 +27,8 @@ class QueryControllerTest {
 	@Test
 	@DisplayName("given a request when query is called then it delegates to QueryService and returns its response")
 	void delegatesToService() {
-		QueryRequest request = new QueryRequest("clientes con tarjeta", false);
-		QueryResponse expected = new QueryResponse("SELECT 1", null);
+		QueryRequest request = new QueryRequest("clientes con tarjeta");
+		QueryResponse expected = new QueryResponse("SELECT 1");
 		when(queryService.generate(request)).thenReturn(expected);
 
 		QueryResponse actual = controller.query(request);
