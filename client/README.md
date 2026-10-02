@@ -170,11 +170,10 @@ un campo `reasoning_content` que es de **solo salida**. El provider lo emite en 
 pero lo **rechaza** (HTTP 400) si se lo reenvían en la request del siguiente turno.
 
 En un tool-calling loop, Spring AI reenvía el historial completo en cada turno, incluido ese
-campo. La solución es el `ReasoningStripInterceptor` (OkHttp), activado por
-`capsula.model.strip-reasoning=true`, que **remueve `reasoning_content`/`reasoning`** del
-body antes de cada POST a `/chat/completions`.
+campo. La solución es el `ReasoningStripInterceptor` (OkHttp), **siempre activo**, que
+**remueve `reasoning_content`/`reasoning`** del body antes de cada POST a `/chat/completions`.
 
-### Modelo CON razonamiento (Groq · `strip-reasoning=true`)
+### Modelo CON razonamiento (Groq)
 
 ```mermaid
 sequenceDiagram
@@ -200,7 +199,7 @@ Sin el interceptor, el segundo turno del loop fallaría con
 > 🤖 El `reasoning_content` lo produce el **modelo** (no el proveedor): es parte de cómo
 > "piensa" un modelo de razonamiento.
 
-### Modelo SIN razonamiento (OpenRouter · `strip-reasoning=false`)
+### Modelo SIN razonamiento (OpenRouter)
 
 ```mermaid
 sequenceDiagram
@@ -212,16 +211,16 @@ sequenceDiagram
     P->>M: ejecuta el modelo
     M-->>P: respuesta (sin reasoning_content)
     P-->>CM: respuesta (sin reasoning_content)
-    Note over CM,M: No hay campo problemático:<br/>el interceptor NO se registra (bean condicional)
+    Note over CM,M: No hay campo problemático:<br/>el interceptor es un no-op (no modifica el body)
 ```
 
-El bean `ReasoningContentStripConfig` es `@ConditionalOnProperty`: si
-`strip-reasoning=false`, **no se crea** y no hay overhead.
+El `ReasoningStripInterceptor` está **siempre activo**, pero es defensivo: para modelos sin
+razonamiento no hay `reasoning_content` que remover, así que reenvía el body intacto (no-op).
 
-| Perfil | Proveedor | Modelo | Razonamiento | `strip-reasoning` |
-|--------|-----------|--------|--------------|-------------------|
-| `groq` | Groq | `qwen/qwen3.8-27b` | Sí | `true` |
-| `openrouter` (default) | OpenRouter | `cohere/north-mini-code:free` | No | `false` |
+| Perfil | Proveedor | Modelo | Razonamiento |
+|--------|-----------|--------|--------------|
+| `groq` | Groq | `qwen/qwen3.8-27b` | Sí |
+| `openrouter` (default) | OpenRouter | `cohere/north-mini-code:free` | No |
 
 ---
 
@@ -277,10 +276,20 @@ spring.ai.mcp.client.streamable-http.connections.server.endpoint=/mcp
 spring.ai.mcp.client.request-timeout=60s     # el loop encadena varias tool-calls
 ```
 
-Setear la API key (PowerShell):
+Cada perfil define su modelo con un default overridable por variable de entorno
+(`${VAR:default}`), para poder cambiarlo sin editar el archivo:
+
+```ini
+# application-openrouter.properties (extracto)
+spring.ai.openai.chat.options.model=${OPENROUTER_MODEL:cohere/north-mini-code:free}
+# application-groq.properties      -> ${GROQ_MODEL:qwen/qwen3.8-27b}
+```
+
+Setear la API key (y opcionalmente el modelo) en PowerShell:
 
 ```powershell
 $env:OPENROUTER_API_KEY = "sk-..."
+$env:OPENROUTER_MODEL   = "qwen/qwen3.8-27b"   # opcional: pisa el modelo por default
 ```
 
 ---
@@ -311,16 +320,19 @@ curl http://localhost:8080/actuator/health   # debe responder {"status":"UP"}
 ### Paso 2 · Elegir proveedor y setear su API key
 
 El client usa **un perfil por proveedor**. Cada perfil necesita su propia variable de
-entorno con la API key. Seteá **solo la del proveedor que vayas a usar**:
+entorno con la API key. Seteá **solo la del proveedor que vayas a usar**. Opcionalmente,
+podés pisar el modelo por default con la variable de modelo del perfil:
 
-| Perfil | Variable de entorno | Obtener la key |
-|--------|---------------------|----------------|
-| `openrouter` (default) | `OPENROUTER_API_KEY` | https://openrouter.ai/keys |
-| `groq` | `GROQ_API_KEY` | https://console.groq.com/keys |
+| Perfil | API key (env) | Modelo (env · opcional) | Obtener la key |
+|--------|---------------|-------------------------|----------------|
+| `openrouter` (default) | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` | https://openrouter.ai/keys |
+| `groq` | `GROQ_API_KEY` | `GROQ_MODEL` | https://console.groq.com/keys |
 
 ```powershell
 # Ejemplo para el perfil por default (openrouter)
 $env:OPENROUTER_API_KEY = "sk-or-..."
+# Opcional: usar otro modelo sin editar el archivo
+$env:OPENROUTER_MODEL = "qwen/qwen3.8-27b"
 ```
 
 ### Paso 3 · Levantar el client (puerto 8081) con el perfil elegido
@@ -368,7 +380,7 @@ flowchart LR
 |---------|----------------|----------|
 | El client arranca pero no usa tools | Server MCP caído al iniciar el client | Levantá el server **primero** y reiniciá el client |
 | `401 Unauthorized` del proveedor | API key faltante o inválida | Verificá la variable de entorno del perfil activo |
-| `400 property 'reasoning_content' is unsupported` | Perfil reasoning sin el interceptor | Usá un perfil con `strip-reasoning=true` (groq) |
+| `400 property 'reasoning_content' is unsupported` | El interceptor no se registró (no debería pasar: está siempre activo) | Verificá que `ReasoningContentStripConfig` esté en el classpath |
 | Timeout en `/api/query` | El loop encadenó muchas tools | Subí `spring.ai.mcp.client.request-timeout` |
 | Puerto 8080/8081 ocupado | Otro proceso usa el puerto | Liberá el puerto o cambiá `server.port` |
 

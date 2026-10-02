@@ -44,20 +44,24 @@ El client puede usar **cualquiera de los dos proveedores** (todos OpenAI-compati
 Cada uno tiene su **perfil de Spring** con su `base-url`, su variable de entorno para la
 API key y su modelo. Elegís uno al levantar la app con `--spring.profiles.active=<perfil>`.
 
-| Perfil | Proveedor | Modelo | Variable de entorno (API key) | Crear la key en |
-|--------|-----------|--------|-------------------------------|-----------------|
-| `groq` | Groq | `qwen/qwen3.8-27b` *(con razonamiento)* | `GROQ_API_KEY` | https://console.groq.com/keys |
-| `openrouter` *(default)* | OpenRouter | `cohere/north-mini-code:free` *(sin razonamiento)* | `OPENROUTER_API_KEY` | https://openrouter.ai/keys |
+| Perfil | Proveedor | Modelo (default) | API key (env) | Modelo (env) | Crear la key en |
+|--------|-----------|------------------|---------------|--------------|-----------------|
+| `groq` | Groq | `qwen/qwen3.8-27b` *(con razonamiento)* | `GROQ_API_KEY` | `GROQ_MODEL` | https://console.groq.com/keys |
+| `openrouter` *(default)* | OpenRouter | `cohere/north-mini-code:free` *(sin razonamiento)* | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` | https://openrouter.ai/keys |
 
 > **Solo necesitás crear la key del proveedor que vayas a usar.** No hace falta tener las dos.
 >
 > El perfil por defecto es **`openrouter`** (definido en `application.properties`). Para usar
 > otro proveedor, activá su perfil al arrancar (ver abajo).
 >
-> **Nota sobre razonamiento:** los modelos `qwen/qwen3.8-27b` (Groq) son *de razonamiento*
+> **Modelo configurable:** cada perfil usa el modelo de la columna *default*, pero podés
+> cambiarlo sin editar nada seteando la variable de entorno correspondiente
+> (`GROQ_MODEL` / `OPENROUTER_MODEL`).
+>
+> **Nota sobre razonamiento:** los modelos como `qwen/qwen3.8-27b` (Groq) son *de razonamiento*
 > y emiten un campo `reasoning_content` que rompe el tool-calling multi-turno. El client lo
-> resuelve con un interceptor que lo elimina, activado por perfil (`capsula.model.strip-reasoning=true`).
-> OpenRouter con el modelo por defecto no razona, así que el interceptor queda desactivado.
+> resuelve con un interceptor **siempre activo** que lo elimina; para modelos sin razonamiento
+> (como el model cohere/north-mini-code:free de OpenRouter) es un no-op y no afecta en nada.
 
 ---
 

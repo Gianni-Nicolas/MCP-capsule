@@ -12,7 +12,6 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okio.Buffer;
 import org.springframework.ai.openai.http.okhttp.OpenAiHttpClientBuilderCustomizer;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -35,11 +34,12 @@ import org.springframework.context.annotation.Configuration;
  * de cada mensaje antes de que la request salga, resolviendo la incompatibilidad sin
  * cambiar de provider ni de modelo.
  *
- * <p>Se activa por la propiedad {@code capsula.model.strip-reasoning=true} (perfiles de
- * modelos reasoning). Para modelos NO-reasoning se deja en false y este bean no se crea.
+ * <p>Esta siempre activo: es defensivo (solo actua sobre {@code /chat/completions} y solo
+ * reescribe el body cuando realmente hay {@code reasoning_content}/{@code reasoning} que
+ * remover). Para modelos sin razonamiento es un no-op (reenvia el body original tal cual),
+ * por lo que no afecta a OpenRouter ni a otros providers que no emiten esos campos.
  */
 @Configuration
-@ConditionalOnProperty(name = "capsula.model.strip-reasoning", havingValue = "true")
 public class ReasoningContentStripConfig {
 
 	@Bean
