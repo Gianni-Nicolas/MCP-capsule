@@ -59,7 +59,6 @@ API key y su modelo. Elegís uno al levantar la app con `--spring.profiles.activ
 > y emiten un campo `reasoning_content` que rompe el tool-calling multi-turno. El client lo
 > resuelve con un interceptor que lo elimina, activado por perfil (`capsula.model.strip-reasoning=true`).
 > OpenRouter con el modelo por defecto no razona, así que el interceptor queda desactivado.
-> Más detalle en [`client/docs/MODELOS_Y_PROVEEDORES.md`](./client/docs/MODELOS_Y_PROVEEDORES.md).
 
 ---
 
