@@ -6,7 +6,7 @@ patrón **MCP (Model Context Protocol)** con **Spring AI 2.0.1**:
 | App | groupId:artifactId | Rol |
 |-----|--------------------|-----|
 | [`server`](./server) | `com.capsula.mcp:server` | Servidor MCP que expone **metadata JDBC read-only** de una base relacional. |
-| [`client`](./client) | `com.capsula.mcp:client` | Cliente MCP + LLM (**Groq / Cerebras / OpenRouter**, elegible por perfil) que traduce **lenguaje natural a SQL** usando las tools del server. |
+| [`client`](./client) | `com.capsula.mcp:client` | Cliente MCP + LLM (**Groq / OpenRouter**, elegible por perfil) que traduce **lenguaje natural a SQL** usando las tools del server. |
 
 ---
 
@@ -15,13 +15,13 @@ patrón **MCP (Model Context Protocol)** con **Spring AI 2.0.1**:
 ```mermaid
 flowchart LR
     User["Usuario<br/>(REST)"] -->|POST /api/query| Client["client<br/>:8081"]
-    Client -->|ChatClient| LLM["Proveedor LLM<br/>(Groq / Cerebras / OpenRouter)"]
+    Client -->|ChatClient| LLM["Proveedor LLM<br/>(Groq / OpenRouter)"]
     Client -->|MCP sobre SSE| Server["server<br/>:8080"]
     Server -->|JDBC metadata| DB[("Base de datos<br/>H2 / Postgres / MySQL / Oracle")]
 ```
 
 El client es **agnóstico del proveedor**: habla con la abstracción `ChatClient` de Spring AI.
-Los tres proveedores soportados son **OpenAI-compatible**, así que cambiar de uno a otro es
+Los dos proveedores soportados son **OpenAI-compatible**, así que cambiar de uno a otro es
 **solo configuración** (un perfil de Spring), sin tocar código.
 
 1. El **client** recibe un pedido en lenguaje natural.
@@ -39,9 +39,9 @@ Los tres proveedores soportados son **OpenAI-compatible**, así que cambiar de u
 
 ---
 
-## Proveedor LLM: Groq, Cerebras u OpenRouter
+## Proveedor LLM: Groq u OpenRouter
 
-El client puede usar **cualquiera de estos tres proveedores** (todos OpenAI-compatible).
+El client puede usar **cualquiera de los dos proveedores** (todos OpenAI-compatible).
 Cada uno tiene su **perfil de Spring** con su `base-url`, su variable de entorno para la
 API key y su modelo. Elegís uno al levantar la app con `--spring.profiles.active=<perfil>`.
 
@@ -50,7 +50,7 @@ API key y su modelo. Elegís uno al levantar la app con `--spring.profiles.activ
 | `groq` | Groq | `qwen/qwen3.8-27b` *(con razonamiento)* | `GROQ_API_KEY` | https://console.groq.com/keys |
 | `openrouter` *(default)* | OpenRouter | `cohere/north-mini-code:free` *(sin razonamiento)* | `OPENROUTER_API_KEY` | https://openrouter.ai/keys |
 
-> **Solo necesitás crear la key del proveedor que vayas a usar.** No hace falta tener las tres.
+> **Solo necesitás crear la key del proveedor que vayas a usar.** No hace falta tener las dos.
 >
 > El perfil por defecto es **`openrouter`** (definido en `application.properties`). Para usar
 > otro proveedor, activá su perfil al arrancar (ver abajo).
@@ -76,14 +76,14 @@ Definí **solo** la variable del proveedor que vayas a usar:
 # PowerShell (Windows) — elegí UNA
 $env:OPENROUTER_API_KEY = "tu_api_key"   # perfil openrouter (default)
 $env:GROQ_API_KEY       = "tu_api_key"   # perfil groq
-$env:CEREBRAS_API_KEY   = "tu_api_key"   # perfil cerebras
+
 ```
 
 ```bash
 # Bash (Linux/macOS) — elegí UNA
 export OPENROUTER_API_KEY="tu_api_key"   # perfil openrouter (default)
 export GROQ_API_KEY="tu_api_key"         # perfil groq
-export CEREBRAS_API_KEY="tu_api_key"     # perfil cerebras
+
 ```
 
 ### 2. Levantar el server (puerto 8080)
@@ -105,11 +105,11 @@ cd client
 .\mvnw.cmd spring-boot:run
 
 # Opción B: elegir el proveedor explícitamente
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=groq"       # o cerebras / openrouter
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=groq"       # o openrouter
 ```
 
 > También podés fijar el perfil con la variable de entorno
-> `$env:SPRING_PROFILES_ACTIVE = "cerebras"` antes de arrancar.
+> `$env:SPRING_PROFILES_ACTIVE = "openrouter"` antes de arrancar.
 
 ### 4. Probar el endpoint
 
