@@ -209,8 +209,6 @@ $env:SPRING_PROFILES_ACTIVE = "postgres"; .\mvnw.cmd spring-boot:run
 
 ## Evolución y futuras mejoras
 
-Algunas ideas para evolucionar este entregable pueden ser:
-
 ### 1. Tool para descubrir valores paramétricos (`db_get_distinct_values`)
 
 **Objetivo:** permitir que la consulta inicial del usuario sea **menos precisa en lenguaje
