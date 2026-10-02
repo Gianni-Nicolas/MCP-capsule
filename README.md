@@ -3,11 +3,10 @@
 Monorepo con dos aplicaciones **Spring Boot 4.1.1 (Java 21)** que implementan el
 patrón **MCP (Model Context Protocol)** con **Spring AI 2.0.1**:
 
-| App | groupId:artifactId | Rol |
-|-----|--------------------|-----|
-| [`server`](./server) | `com.capsula.mcp:server` | Servidor MCP que expone **metadata JDBC read-only** de una base relacional. |
-| [`client`](./client) | `com.capsula.mcp:client` | Cliente MCP + LLM (**Groq / OpenRouter**, elegible por perfil) que traduce **lenguaje natural a SQL** usando las tools del server. |
-
+| App | groupId:artifactId | Rol                                                                                                                                                                                                                      |
+|-----|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [`server`](./server) | `com.capsula.mcp:server` | Servidor MCP que expone **metadata JDBC read-only** de una base relacional.                                                                                                                                              |
+| [`client`](./client) | `com.capsula.mcp:client` | Cliente MCP que traduce **lenguaje natural a SQL** usando un LLM (**Groq / OpenRouter**, elegible por perfil) que, mediante **tools MCP**, inspecciona el esquema real de una base de datos antes de construir la query. |
 ---
 
 ## Arquitectura
