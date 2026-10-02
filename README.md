@@ -191,15 +191,12 @@ $env:SPRING_PROFILES_ACTIVE = "postgres"; .\mvnw.cmd spring-boot:run
 
 ---
 
-## Tests
+## Configuración de puertos y endpoints
 
-```powershell
-# Server
-cd server; .\mvnw.cmd test
-
-# Client
-cd client; .\mvnw.cmd test
-```
+| App | Puerto | Endpoint principal |
+|-----|--------|--------------------|
+| server | `8080` | Streamable HTTP MCP en `/mcp`, consola H2 en `/h2-console` |
+| client | `8081` | `POST /api/query`, Swagger UI en `/swagger-ui.html` |
 
 ---
 
@@ -210,9 +207,72 @@ cd client; .\mvnw.cmd test
 
 ---
 
-## Configuración de puertos y endpoints
+## Evolución y futuras mejoras
 
-| App | Puerto | Endpoint principal |
-|-----|--------|--------------------|
-| server | `8080` | Streamable HTTP MCP en `/mcp`, consola H2 en `/h2-console` |
-| client | `8081` | `POST /api/query`, Swagger UI en `/swagger-ui.html` |
+Algunas ideas para evolucionar este entregable pueden ser:
+
+### 1. Tool para descubrir valores paramétricos (`db_get_distinct_values`)
+
+**Objetivo:** permitir que la consulta inicial del usuario sea **menos precisa en lenguaje
+natural**.
+
+Hoy, para filtrar por un estado, el usuario/LLM necesita conocer el valor exacto almacenado en
+la base de datos (ej. `status: APROBADO`). Una tool como `db_get_distinct_values` permitiría
+descubrir el **vocabulario real de las columnas paramétricas** (estados, tipos, categorías, etc.)
+antes de construir el filtro.
+
+Por ejemplo, ante una consulta ambigua como:
+
+> "Préstamos que ya salieron"
+
+el LLM podría consultar los valores disponibles para `loan.status`, descubrir que existen
+`{APROBADO, PENDIENTE}`, y utilizar el valor correspondiente para construir el filtro.
+Esto desacopla al usuario del conocimiento específico de cómo están representados los valores
+en la base de datos y permite que el LLM pueda resolver consultas con mayor flexibilidad.
+
+### 2. Orquestación con máquina de estados (estilo LangGraph)
+
+Actualmente, el loop de tool-calling es manejado de forma reactiva por el cliente/LLM, guiado
+principalmente por el **system prompt**. 
+Una evolución natural sería incorporar una **máquina de estados explícita** que defina el flujo
+de resolución de una consulta. Por ejemplo:
+
+> Descubrir schema → Identificar tabla → Resolver valores paramétricos → Construir query → Validar → Ejecutar
+
+El concepto es similar al utilizado por frameworks como LangGraph en Python. En el ecosistema
+JVM/Spring podría abordarse, por ejemplo, utilizando **Spring Statemachine**, definiendo estados,
+eventos y transiciones de forma declarativa.
+Las tools MCP actuales podrían mantenerse como las acciones ejecutadas por cada estado,
+mientras que la máquina de estados sería responsable de controlar el flujo.
+
+Esto permitiría:
+
+- Tener flujos más reproducibles y auditables.
+- Definir un orden explícito de ejecución.
+- Incorporar reintentos y manejo de errores por estado.
+- Establecer precondiciones para determinadas acciones.
+- Reducir la dependencia del LLM para decidir qué tool ejecutar a continuación.
+
+### 3. Tools más abarcativas para optimizar el flujo
+
+Actualmente, las tools están deliberadamente atomizadas (una responsabilidad por tool) para
+forzar un loop de tool-calling más activo entre el cliente MCP y el server. Esto forma parte del
+objetivo del challenge: observar cómo el LLM orquesta múltiples llamadas para resolver un flujo.
+
+Si se implementa la máquina de estados del punto anterior, este enfoque podría replantearse.
+Al contar con un flujo determinista, ya no dependeríamos del LLM para "descubrir" el orden de las
+llamadas. Esto permitiría redefinir las tools hacia un diseño más abarcativo, reduciendo la
+cantidad de round-trips necesarios sin perder el control sobre el flujo.
+
+De esta forma, cada estado podría invocar una tool que resuelva en una única llamada lo que
+actualmente requiere varias invocaciones atómicas. Esto permitiría reducir:
+
+- Cantidad de round-trips entre cliente y server.
+- Consumo de tokens asociado al tool-calling.
+- Latencia del flujo completo.
+- Costo de ejecución.
+
+Por ejemplo, `db_get_table_columns` y `db_get_foreign_keys` podrían unificarse en una única tool
+que devuelva las columnas y las FKs de una tabla, evitando dos invocaciones secuenciales.
+El objetivo no sería simplemente hacer las tools más grandes, sino aprovechar la existencia de
+un flujo determinista para agrupar operaciones que naturalmente forman parte de un mismo paso.
