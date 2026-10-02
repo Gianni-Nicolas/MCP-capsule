@@ -240,7 +240,7 @@ código de este repo o algo que trae Spring AI por dependencia.
 | `ToolCallback` (MCP) | 🟦 Spring AI | Representación de una tool MCP que el `ChatModel` puede invocar. |
 | Proveedor LLM | ⬜ Externo | **Infraestructura** que expone la API OpenAI-compatible: Groq / OpenRouter. Recibe el POST y ejecuta el modelo. No "piensa" él mismo. |
 | Modelo LLM | 🤖 Externo | El **LLM** que corre en la infra del proveedor (`qwen/qwen3.8-27b`, `north-mini-code`, …). Es quien realmente razona, decide las tools y genera el SQL. Se elige con `spring.ai.openai.chat.options.model`. |
-| Server MCP | ⬜ Externo | Servicio de metadata JDBC; se consulta por SSE en `:8080`. |
+| Server MCP | ⬜ Externo | Servicio de metadata JDBC; se consulta por Streamable HTTP en `:8080`. |
 
 > **Idea clave**: tu código habla con la **fachada** `ChatClient`. Toda la maquinaria de
 > hablar REST con el proveedor y de repetir el loop de tools vive en `OpenAiChatModel`, que
@@ -497,7 +497,7 @@ las observaciones relevantes de Spring AI:
 ```
 [IA] LLM   modelo=qwen/qwen3.8-27b · 812 ms
 [IA] TOOL  db_list_tables · 41 ms
-[IA] TOOL  db_get_table_snapshot · 55 ms
+[IA] TOOL  db_get_table_columns · 55 ms
 ```
 
 Endpoints de Actuator expuestos: `health`, `info`, `metrics`.
