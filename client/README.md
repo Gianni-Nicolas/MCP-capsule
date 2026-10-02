@@ -32,7 +32,7 @@ llamar y en qué orden mediante un **tool-calling loop** gestionado por Spring A
 ## Características
 
 - 🗣️ **NL→SQL**: convierte un pedido en lenguaje natural en una sentencia SQL válida.
-- 🔌 **Tools MCP**: el LLM inspecciona el esquema real vía un server MCP (transporte SSE).
+- 🔌 **Tools MCP**: el LLM inspecciona el esquema real vía un server MCP (transporte Streamable HTTP).
 - 🔁 **Tool-calling loop automático**: gestionado por Spring AI; el LLM encadena varias
   tools antes de responder.
 - 🔀 **Multi-proveedor**: Groq y OpenRouter (todos OpenAI-compatible) por perfil,
@@ -85,7 +85,7 @@ flowchart LR
     Service --> ChatClient
     ChatModel <-->|REST OpenAI-compatible| Provider
     ChatModel --> Recording
-    Recording -->|SSE| MCP[(Server MCP<br/>metadata JDBC)]
+    Recording -->|Streamable HTTP| MCP[(Server MCP<br/>metadata JDBC)]
     MCP --> DB[(Base de datos)]
     Recording --> Recorder
     Recorder -.traza.-> Service
@@ -99,7 +99,7 @@ flowchart LR
 Hay **dos canales de red** distintos:
 
 1. **Cliente ↔ Proveedor LLM**: REST (protocolo OpenAI), donde ocurre el tool-calling loop.
-2. **Cliente ↔ Server MCP**: SSE (`http://localhost:8080/sse`), donde se ejecutan las tools.
+2. **Cliente ↔ Server MCP**: Streamable HTTP (`http://localhost:8080/mcp`), donde se ejecutan las tools.
 
 > **Proveedor ≠ Modelo.** El **proveedor** (Groq, OpenRouter) es la
 > **infraestructura** que expone la API REST; el **modelo** (p. ej. `qwen/qwen3.8-27b`) es el
@@ -144,7 +144,7 @@ sequenceDiagram
         M-->>P: decide usar una tool
         P-->>CM: finish_reason=tool_calls
         CM->>RC: call(toolInput)
-        RC->>MCP: ejecuta tool (SSE)
+        RC->>MCP: ejecuta tool (Streamable HTTP)
         MCP-->>RC: resultado (metadata JDBC)
         RC-->>CM: resultado
         RC->>RC: recorder.record(...)
@@ -271,7 +271,7 @@ código de este repo o algo que trae Spring AI por dependencia.
 ## Requisitos
 
 - **JDK 21**
-- **Server MCP** de metadata corriendo en `http://localhost:8080` (con endpoint `/sse`).
+- **Server MCP** de metadata corriendo en `http://localhost:8080` (con endpoint `/mcp`).
 - **API key** del proveedor elegido, en variable de entorno:
   - `GROQ_API_KEY` u `OPENROUTER_API_KEY`.
 
@@ -287,8 +287,8 @@ por perfil (`application-<perfil>.properties`). Se alterna con `spring.profiles.
 server.port=8081
 spring.profiles.active=openrouter            # groq | openrouter
 
-spring.ai.mcp.client.sse.connections.server.url=http://localhost:8080
-spring.ai.mcp.client.sse.connections.server.sse-endpoint=/sse
+spring.ai.mcp.client.streamable-http.connections.server.url=http://localhost:8080
+spring.ai.mcp.client.streamable-http.connections.server.endpoint=/mcp
 spring.ai.mcp.client.request-timeout=60s     # el loop encadena varias tool-calls
 ```
 
@@ -308,7 +308,7 @@ estar corriendo a la vez: el **server MCP** (puerto 8080) y el **client** (puert
 ### Paso 1 · Levantar el server MCP (puerto 8080)
 
 El client **no arranca con sus tools** si el server MCP no está disponible: en el arranque,
-el `spring-ai-starter-mcp-client` se conecta por SSE a `http://localhost:8080/sse` para
+el `spring-ai-starter-mcp-client` se conecta por Streamable HTTP a `http://localhost:8080/mcp` para
 descubrir las tools. **Siempre levantá el server primero.**
 
 ```powershell

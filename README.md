@@ -16,7 +16,7 @@ patrón **MCP (Model Context Protocol)** con **Spring AI 2.0.1**:
 flowchart LR
     User["Usuario<br/>(REST)"] -->|POST /api/query| Client["client<br/>:8081"]
     Client -->|ChatClient| LLM["Proveedor LLM<br/>(Groq / OpenRouter)"]
-    Client -->|MCP sobre SSE| Server["server<br/>:8080"]
+    Client -->|MCP sobre Streamable HTTP| Server["server<br/>:8080"]
     Server -->|JDBC metadata| DB[("Base de datos<br/>H2 / Postgres / MySQL / Oracle")]
 ```
 
@@ -197,5 +197,5 @@ cd client; .\mvnw.cmd test
 
 | App | Puerto | Endpoint principal |
 |-----|--------|--------------------|
-| server | `8080` | SSE MCP en `/sse`, mensajes en `/mcp/message`, consola H2 en `/h2-console` |
+| server | `8080` | Streamable HTTP MCP en `/mcp`, consola H2 en `/h2-console` |
 | client | `8081` | `POST /api/query`, Swagger UI en `/swagger-ui.html` |

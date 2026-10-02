@@ -26,9 +26,11 @@ Servidor MCP (Spring Boot + Spring AI) que expone metadata JDBC de una unica bas
 
 - **Spring Boot 4** (web MVC, JDBC, actuator, validation).
 - **Spring AI `2.0.1`**, via el starter `spring-ai-starter-mcp-server-webmvc`.
-  - Autoconfigura el servidor MCP sobre HTTP usando **SSE** (Server-Sent Events).
+  - Autoconfigura el servidor MCP sobre HTTP usando **Streamable HTTP** (spec MCP
+    2025-03-26), el transporte recomendado desde la version 2.0.1 de Spring AI.
   - El servidor corre en modo **SYNC** (`spring.ai.mcp.server.type=SYNC`).
-  - Endpoints por default: `GET /sse` (stream) y `POST /mcp/message` (mensajes JSON-RPC).
+  - Endpoint por default: `POST /mcp` (request/response + stream en el mismo endpoint).
+  - Se activa con `spring.ai.mcp.server.protocol=STREAMABLE`.
 - **JDBC puro** sobre `DatabaseMetaData`: sin SQL vendor-specific, agnostico de motor.
 
 El starter escanea beans que exponen metodos anotados con `@Tool` y los publica como
@@ -79,9 +81,9 @@ flowchart TD
     B --> D[Bean DatabaseMetadataTools]
     D --> E[McpToolConfiguration<br/>toolCallbackProvider]
     E --> F[ToolCallbackProvider<br/>7 tools @Tool]
-    C --> G[McpServer SYNC + SSE]
+    C --> G[McpServer SYNC + Streamable HTTP]
     F --> G
-    G --> H[Listo: GET /sse y POST /mcp/message]
+    G --> H[Listo: POST /mcp]
 ```
 
 ## Flujo de una invocacion de tool
@@ -91,7 +93,7 @@ Un cliente MCP (o un LLM a traves de el) llama una tool y la respuesta viaja por
 ```mermaid
 sequenceDiagram
     participant LLM as Cliente/LLM
-    participant MCP as Spring AI MCP Server (SSE)
+    participant MCP as Spring AI MCP Server (Streamable HTTP)
     participant Tools as DatabaseMetadataTools (@Tool)
     participant Svc as JdbcMetadataService
     participant DB as DatabaseMetaData (JDBC)
@@ -103,7 +105,7 @@ sequenceDiagram
     DB-->>Svc: ResultSet metadata
     Svc-->>Tools: List<ColumnInfo> (records)
     Tools-->>MCP: Resultado serializado (JSON)
-    MCP-->>LLM: SSE event con el resultado JSON-RPC
+    MCP-->>LLM: Respuesta JSON-RPC (stream SSE sobre /mcp)
 ```
 
 ## Puesta en marcha
@@ -143,8 +145,9 @@ hay que descomentar el del motor elegido (no hace falta agregarlos a mano).
 # Health check de actuator
 curl http://localhost:8080/actuator/health
 
-# Endpoint SSE del servidor MCP (queda abierto escuchando eventos)
-curl http://localhost:8080/sse
+# Endpoint MCP Streamable HTTP (responde a POST con mensajes JSON-RPC)
+curl -X POST http://localhost:8080/mcp -H "Content-Type: application/json" `
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
 
 ```
 
@@ -154,8 +157,8 @@ Apunta tu cliente MCP (por ejemplo un host compatible) al transporte SSE:
 
 ```jsonc
 {
-  "url": "http://localhost:8080/sse",
-  "transport": "sse"
+  "url": "http://localhost:8080/mcp",
+  "transport": "streamable-http"
 }
 ```
 
@@ -262,8 +265,9 @@ jdbc:h2:mem:mcpdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
 
 ## Notas de diseno
 
-- Transporte MCP sobre **SSE** (`spring-ai-starter-mcp-server-webmvc`), server **SYNC**;
-  configurable en `application.properties` (`spring.ai.mcp.server.*`).
+- Transporte MCP sobre **Streamable HTTP** (`spring-ai-starter-mcp-server-webmvc`),
+  endpoint unico `/mcp`, server **SYNC**; configurable en `application.properties`
+  (`spring.ai.mcp.server.*`).
 - Todas las tools son read-only sobre `DatabaseMetaData`, sin SQL vendor-specific.
 - Identifiers se normalizan al case natural del motor (upper en H2/Oracle, lower en Postgres).
 - Errores JDBC se envuelven en `MetadataAccessException` con SQLState para diagnostico.

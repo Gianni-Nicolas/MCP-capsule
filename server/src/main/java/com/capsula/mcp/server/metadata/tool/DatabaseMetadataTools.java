@@ -135,6 +135,10 @@ public class DatabaseMetadataTools {
 		return result;
 	}
 
+	/* 	Resuelve la tarea con menos iteraciones del loop de tool-calling, pero esta
+		DESACTIVADA a proposito: queremos observar al LLM orquestar varias tools
+		atomicas en el loop en vez de resolver todo en un unico call.
+		Fue utilizada inicialmente en las primeras pruebas entre el cliente y servidor. */
 	/*@Tool(name = "db_get_table_snapshot",
 			description = "Vista agregada de una tabla en una sola llamada: metadata + columnas + primary key + foreign keys + indices. "
 					+ "Ideal para que un LLM entienda una tabla completa antes de generar una query.")*/
